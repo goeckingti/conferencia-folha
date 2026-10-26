@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Conferência de Folha Analítica - Acesso Restrito</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+  <style>
+    :root {
+      --bg: #f3f5f6; --panel: #ffffff; --sunk: #ebeff1; --ink: #1a2329; --muted: #5a6871; --line: #d8dfe3;
+      --accent: #1d5c74; --accent-ink: #ffffff; --accent-soft: #e2edf1;
+      --bad: #b1342c; --bad-soft: #f6e1df; --r: 8px;
+    }
+    body { background: var(--bg); color: var(--ink); font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 14px; margin: 0; padding: 0; }
+    
+    /* Tela de Login Centralizada */
+    #auth-screen-wrapper {
+      display: flex; align-items: center; justify-content: center; min-height: 100vh; width: 100vw; position: fixed; top: 0; left: 0; background: var(--bg); z-index: 9999;
+    }
+    .auth-box { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 32px; width: 100%; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 16px; box-sizing: border-box; }
+    .auth-box h2 { margin: 0 0 8px 0; font-size: 1.5rem; color: var(--accent); }
+    .auth-box p { margin: 0 0 16px 0; color: var(--muted); font-size: 0.9rem; }
+    .inp { padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; font-size: 1rem; width: 100%; box-sizing: border-box; }
+    .btn-login-custom { padding: 10px 16px; background: var(--accent); color: var(--accent-ink); border: none; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; }
+    .btn-login-custom:hover { opacity: 0.9; }
+    .msg { font-size: 0.85rem; color: var(--bad); background: var(--bad-soft); padding: 8px; border-radius: 4px; display: none; }
+    .hidden { display: none !important; }
+    .user-bar { position: fixed; top: 10px; right: 10px; background: var(--panel); border: 1px solid var(--line); padding: 8px 16px; border-radius: 20px; font-size: 0.85rem; display: flex; gap: 12px; align-items: center; z-index: 1000; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+    .user-bar button { background: none; border: none; color: var(--bad); cursor: pointer; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <!-- TELA DE LOGIN / BLOQUEIO -->
+  <div id="auth-screen-wrapper">
+    <div class="auth-box">
+      <h2>Conferência de Folha</h2>
+      <p id="auth-subtitle">Faça login para acessar a ferramenta.</p>
+      
+      <div id="error-msg" class="msg"></div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px;" id="login-form-fields">
+        <input type="email" id="email" class="inp" placeholder="Seu e-mail">
+        <input type="password" id="password" class="inp" placeholder="Sua senha">
+        <button type="button" id="btn-login" class="btn-login-custom">Entrar</button>
+      </div>
+
+      <div id="pending-msg" class="hidden" style="text-align: center; color: var(--muted); margin-top: 10px;">
+        <p><b>Assinatura Pendente ou Não Ativada.</b></p>
+        <p style="font-size: 0.85rem; margin-top: 6px;">Realize o pagamento para liberar o seu acesso com este e-mail.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- BARRA DO USUÁRIO LOGADO -->
+  <div id="user-bar" class="user-bar hidden">
+    <span id="user-email-display"></span>
+    <button type="button" id="btn-logout">Sair</button>
+  </div>
+
+  <!-- A FERRAMENTA COMPLETA DO CLIENTE (O CÓDIGO DO CLAUDE) -->
+  <div id="app-protected-content" class="hidden">
+    <!-- Aqui entra o miolo original do HTML do seu cliente -->
+    <style>
+      :root {
+        --bg: #f3f5f6; --panel: #ffffff; --sunk: #ebeff1; --ink: #1a2329; --muted: #5a6871; --line: #d8dfe3;
+        --accent: #1d5c74; --accent-ink: #ffffff; --accent-soft: #e2edf1;
+        --ok: #2c7549; --warn: #9a5f0a; --bad: #b1342c; --ok-soft: #e4f1e8; --warn-soft: #f6ecda; --bad-soft: #f6e1df;
+        --c1: #1d5c74; --c2: #c2872a; --c3: #93a3ac; --crit: #b1342c;
+        --shadow: 0 1px 2px rgba(20, 35, 45, .06), 0 8px 24px rgba(20, 35, 45, .06);
+        --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+        --fs-xs: .75rem; --fs-sm: .8125rem; --fs-md: .9375rem; --fs-lg: 1.125rem; --fs-xl: 1.625rem; --fs-xxl: 2.125rem;
+        --r: 8px;
+      }
+      body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: var(--fs-md); line-height: 1.5; }
+      .wrap { max-width: 1280px; margin-inline: auto; padding-block: 28px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 24px; }
+      h1, h2, h3, h4 { margin: 0; text-wrap: balance; }
+      p { margin: 0; }
+      button, input, select { font: inherit; color: inherit; }
+      :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+      .num, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+      .muted { color: var(--muted); }
+      .eyebrow { font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+      .top { display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: flex-end; justify-content: space-between; }
+      .top-text { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1 1 28rem; }
+      .top h1 { font-size: var(--fs-xxl); font-weight: 600; letter-spacing: -.01em; line-height: 1.15; }
+      .top .lead { color: var(--muted); max-width: 64ch; }
+      .privacy { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-sm); color: var(--muted); }
+      .import { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; }
+      @media (max-width: 52rem) { .import { grid-template-columns: minmax(0, 1fr); } }
+      .slot { position: relative; display: flex; gap: 14px; align-items: center; padding: 18px 20px; border: 1.5px dashed var(--line); border-radius: var(--r); background: var(--panel); cursor: pointer; min-width: 0; transition: border-color .15s, background .15s; }
+      .slot:hover, .slot.drag { border-color: var(--accent); background: var(--accent-soft); }
+      .slot.loaded { border-style: solid; }
+      .slot.primary { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+      .slot input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+      .slot-icon { flex: none; width: 40px; height: 40px; border-radius: 8px; display: grid; place-items: center; background: var(--sunk); color: var(--accent); }
+      .slot.loaded .slot-icon { background: var(--accent); color: var(--accent-ink); }
+      .slot-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+      .slot-title { font-weight: 600; }
+      .slot-sub { font-size: var(--fs-sm); color: var(--muted); overflow-wrap: anywhere; }
+      .slot-sub.err { color: var(--bad); }
+      .slot-clear { position: relative; z-index: 2; margin-left: auto; flex: none; background: none; border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; font-size: var(--fs-sm); color: var(--muted); cursor: pointer; }
+      .slot-clear:hover { color: var(--ink); border-color: var(--muted); }
+      .progress { height: 3px; border-radius: 2px; background: var(--sunk); overflow: hidden; margin-top: 6px; }
+      .progress i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .15s; }
+      .meta { display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: center; padding: 16px 20px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); }
+      .meta dl { display: flex; flex-wrap: wrap; gap: 10px 28px; margin: 0; flex: 1 1 36rem; min-width: 0; }
+      .meta dl div { display: flex; flex-direction: column; min-width: 0; }
+      .meta dt { font-size: var(--fs-xs); color: var(--muted); }
+      .meta dd { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
+      .verdict { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; font-weight: 600; font-size: var(--fs-sm); white-space: nowrap; }
+      .verdict::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+      .v-ok { color: var(--ok); background: var(--ok-soft); }
+      .v-warn { color: var(--warn); background: var(--warn-soft); }
+      .v-bad { color: var(--bad); background: var(--bad-soft); }
+      .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-sm); color: var(--muted); cursor: pointer; white-space: nowrap; }
+      .toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
+      .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+      .tab { appearance: none; background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; padding: 10px 16px; color: var(--muted); cursor: pointer; white-space: nowrap; font-weight: 500; display: inline-flex; gap: 8px; align-items: center; }
+      .tab:hover { color: var(--ink); }
+      .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+      .tab .badge { font-family: var(--mono); font-size: var(--fs-xs); padding: 0 6px; border-radius: 999px; background: var(--sunk); color: var(--muted); }
+      .tab[aria-selected="true"] .badge { background: var(--accent-soft); color: var(--accent); }
+      .view { display: flex; flex-direction: column; gap: 20px; }
+      .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); gap: 12px; }
+      .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+      .kpi-l { font-size: var(--fs-sm); color: var(--muted); }
+      .kpi-v { font-family: var(--sans); font-size: var(--fs-xl); font-weight: 600; letter-spacing: -.01em; line-height: 1.2; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+      .kpi-v.bad { color: var(--bad); } .kpi-v.warn { color: var(--warn); } .kpi-v.ok { color: var(--ok); }
+      .kpi-n { font-size: var(--fs-xs); color: var(--muted); font-variant-numeric: tabular-nums; }
+      .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); gap: 16px; }
+      .card { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+      .card-h { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: flex-start; justify-content: space-between; }
+      .card-h > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+      .card h3 { font-size: var(--fs-lg); font-weight: 600; }
+      .note { font-size: var(--fs-sm); color: var(--muted); max-width: 80ch; }
+      .section-h { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: flex-end; justify-content: space-between; }
+      .section-h h2 { font-size: var(--fs-lg); font-weight: 600; }
+      .bars { display: flex; flex-direction: column; gap: 8px; }
+      .bar { display: grid; grid-template-columns: minmax(0, 12rem) minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: var(--fs-sm); }
+      .bar-l { overflow-wrap: anywhere; line-height: 1.3; }
+      .bar-t { min-width: 0; }
+      .bar-f { display: flex; height: 12px; border-radius: 4px; overflow: hidden; min-width: 2px; }
+      .bar:hover .bar-f { filter: brightness(1.08); }
+      .bar-s { height: 100%; min-width: 0; }
+      .bar-v { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; font-size: var(--fs-xs); }
+      .bar-v small { color: var(--muted); font-size: inherit; }
+      @media (max-width: 34rem) { .bar { grid-template-columns: minmax(0, 1fr) auto; } .bar-t { grid-column: 1 / -1; grid-row: 2; } }
+      .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: var(--fs-xs); color: var(--muted); }
+      .legend span { display: inline-flex; align-items: center; gap: 6px; }
+      .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; flex: none; }
+      .tip { position: absolute; z-index: 20; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); padding: 6px 10px; font-size: var(--fs-xs); max-width: 18rem; }
+      .tip-h { color: var(--muted); margin-bottom: 2px; }
+      .tip-l { display: flex; gap: 6px; align-items: center; font-variant-numeric: tabular-nums; }
+      .tip-l b { font-family: var(--mono); font-weight: 500; }
+      .pill { display: inline-flex; align-items: center; gap: 6px; padding: 1px 9px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 500; white-space: nowrap; line-height: 1.6; }
+      .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+      .p-ok { color: var(--ok); background: var(--ok-soft); }
+      .p-warn { color: var(--warn); background: var(--warn-soft); }
+      .p-bad { color: var(--bad); background: var(--bad-soft); }
+      .p-muted { color: var(--muted); background: var(--sunk); }
+      .tw { overflow: auto; max-height: 34rem; border: 1px solid var(--line); border-radius: 6px; }
+      .tw.free { max-height: none; }
+      table.t { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+      .t th { position: sticky; top: 0; z-index: 1; background: var(--sunk); text-align: left; font-weight: 500; font-size: var(--fs-xs); color: var(--muted); padding: 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+      .t th button { all: unset; display: block; padding: 7px 10px; cursor: pointer; }
+      .t th button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+      .t th[aria-sort="ascending"] button::after { content: " ↑"; }
+      .t th[aria-sort="descending"] button::after { content: " ↓"; }
+      .t th.r button, .t td.r { text-align: right; }
+      .t td { padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      .t td.r { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; font-size: var(--fs-xs); }
+      .t td.z { color: var(--muted); }
+      .t td.neg { color: var(--bad); } .t td.pos { color: var(--ok); }
+      .t tbody tr:last-child td { border-bottom: 0; }
+      .t tbody tr:hover td { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+      .t tbody tr.click { cursor: pointer; }
+      .t tbody tr.sel td { background: var(--accent-soft); }
+      .t td.wrap { min-width: 16rem; }
+      .t .code { font-family: var(--mono); font-size: var(--fs-xs); }
+      @media (max-width: 46rem) { .t .sec { display: none; } }
+      .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+      .inp, .sel { padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); font-size: var(--fs-sm); min-width: 0; max-width: 100%; }
+      .sel { text-overflow: ellipsis; }
+      .inp { flex: 1 1 14rem; }
+      .count { font-size: var(--fs-sm); color: var(--muted); font-variant-numeric: tabular-nums; margin-left: auto; }
+      .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); font-size: var(--fs-sm); cursor: pointer; white-space: nowrap; }
+      .btn:hover { border-color: var(--accent); color: var(--accent); }
+      .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+      .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+      .chip { padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); font-size: var(--fs-sm); cursor: pointer; color: var(--muted); }
+      .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+      .copybox { display: flex; flex-direction: column; gap: 6px; }
+      .copybox textarea { width: 100%; min-height: 8rem; font-family: var(--mono); font-size: var(--fs-xs); background: var(--sunk); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 8px; box-sizing: border-box; }
+      .finding { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); display: grid; grid-template-columns: 4px minmax(0, 1fr); overflow: hidden; }
+      .finding .sev { background: var(--c3); }
+      .finding.alta .sev { background: var(--bad); } .finding.media .sev { background: var(--warn); }
+      .f-body { padding: 14px 18px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+      .f-top { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+      .f-code { font-family: var(--mono); font-weight: 500; font-size: var(--fs-sm); }
+      .f-rule { font-size: var(--fs-xs); color: var(--muted); }
+      .f-title { font-size: var(--fs-md); font-weight: 600; }
+      .f-facts { display: flex; flex-wrap: wrap; gap: 6px 28px; font-size: var(--fs-sm); }
+      .f-facts span { color: var(--muted); }
+      .f-facts b { font-family: var(--mono); font-weight: 500; font-variant-numeric: tabular-nums; }
+      .f-text { font-size: var(--fs-sm); max-width: 90ch; }
+      .f-text span { color: var(--muted); }
+      details.more > summary { cursor: pointer; font-size: var(--fs-sm); color: var(--accent); width: fit-content; }
+      details.more[open] > summary { margin-bottom: 8px; }
+      .linkbtn { all: unset; cursor: pointer; color: var(--accent); font-family: var(--mono); font-size: var(--fs-xs); text-decoration: underline; text-underline-offset: 2px; }
+      .linkbtn:focus-visible { outline: 2px solid var(--accent); }
+      .emp-head { display: flex; flex-wrap: wrap; gap: 6px 24px; align-items: baseline; }
+      .emp-head h3 { font-size: var(--fs-lg); }
+      .emp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: 16px; }
+      .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: 10px 20px; margin: 0; }
+      .facts div { display: flex; flex-direction: column; min-width: 0; }
+      .facts dt { font-size: var(--fs-xs); color: var(--muted); }
+      .facts dd { margin: 0; font-size: var(--fs-sm); overflow-wrap: anywhere; }
+      .facts dd.num { font-family: var(--mono); }
+      .sub-h { font-size: var(--fs-sm); font-weight: 600; margin-bottom: 6px; }
+      .ev-layout { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; align-items: start; }
+      .ev-list .tw { max-height: 40rem; }
+      @media (max-width: 64rem) { .ev-layout { grid-template-columns: minmax(0, 1fr); } }
+      .rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); gap: 10px; }
+      .rule { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; padding: 12px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); }
+      .rule .id { font-family: var(--mono); font-size: var(--fs-xs); color: var(--accent); grid-row: span 2; padding-top: 2px; }
+      .rule b { font-weight: 600; font-size: var(--fs-sm); }
+      .rule p { font-size: var(--fs-xs); color: var(--muted); }
+      .empty { display: flex; flex-direction: column; gap: 16px; }
+      .empty-h { display: flex; flex-direction: column; gap: 4px; }
+      .empty-h h2 { font-size: var(--fs-lg); font-weight: 600; }
+      .params { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: 12px; }
+      .params label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-xs); color: var(--muted); }
+      .params input { padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); font-family: var(--mono); font-size: var(--fs-sm); color: var(--ink); }
+      .banner { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; padding: 14px 18px; border-radius: var(--r); }
+      .banner.v-warn, .banner.v-bad, .banner.v-ok { font-weight: 400; }
+      .banner p { color: var(--ink); font-size: var(--fs-sm); max-width: 80ch; }
+      .alert { padding: 12px 16px; border-radius: var(--r); background: var(--warn-soft); color: var(--ink); font-size: var(--fs-sm); }
+      .alert.err { background: var(--bad-soft); }
+      @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+    </style>
+
+    <div class="wrap">
+      <header class="top">
+        <div class="top-text">
+          <span class="eyebrow">TOTVS RM Labore · Folha Analítica</span>
+          <h1>Conferência de Folha Analítica</h1>
+          <p class="lead">Importe o PDF da analítica e a ferramenta lê cada funcionário, reconcilia com o Total Geral e recalcula bases, encargos e eventos.</p>
+        </div>
+        <span class="privacy"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.4" d="M4 7V5a4 4 0 0 1 8 0v2M3.2 7h9.6v7H3.2z"/></svg>O PDF é lido no seu navegador. Nada é enviado.</span>
+      </header>
+
+      <section class="import" aria-label="Importar arquivos">
+        <label class="slot primary" id="slot-L">
+          <input type="file" id="file-L" accept="application/pdf,.pdf" multiple aria-label="Importar analíticas da competência">
+          <span class="slot-icon"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" d="M5 2.8h6.5L15 6.3v10.9H5zM11.3 2.8v3.7H15M10 9v5.5M7.6 11.6 10 9l2.4 2.6"/></svg></span>
+          <span class="slot-body"><span class="slot-title">Analíticas da competência</span><span class="slot-sub" id="sub-L">Arraste os PDFs aqui ou clique para escolher. Pode importar vários: completa, mensal, adiantamento, PLR, complementar</span><span class="progress" id="prog-L" hidden><i></i></span></span>
+        </label>
+        <label class="slot" id="slot-B">
+          <input type="file" id="file-B" accept="application/pdf,.pdf" aria-label="Importar Folha Analítica de comparação">
+          <span class="slot-icon"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" d="M3 6h10M10 3l3 3-3 3M17 14H7M10 11l-3 3 3 3"/></svg></span>
+          <span class="slot-body"><span class="slot-title">Comparar com outra competência</span><span class="slot-sub" id="sub-B">Opcional. Importe a analítica do mês anterior</span><span class="progress" id="prog-B" hidden><i></i></span></span>
+        </label>
+      </section>
+
+      <div id="app" class="view"></div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+  
+  <!-- Script do Motor Original do Claude -->
+  <script>
+  (function (root) {
+    'use strict';
+    const NUM_RE = /^-?\d{1,3}(\.\d{3})*,\d{2}$|^-?\d+,\d{2}$/;
+    const DATE_RE = /^\d{2}\/\d{2}\/\d{4}$/;
+    const num = (s) => Number(String(s).replace(/\./g, '').replace(',', '.'));
+    const r2 = (v) => Math.round((v + Number.EPSILON) * 100) / 100;
+    const trunc2 = (v) => Math.floor(v * 100 + 1e-6) / 100;
+    const isNumTok = (s) => NUM_RE.test(s);
+    function pageLines(items) {
+      const its = items.filter((i) => i.s && i.s.trim()).sort((a, b) => b.y - a.y || a.x - b.x);
+      const lines = [];
+      for (const it of its) {
+        let l = null;
+        for (let k = lines.length - 1; k >= 0 && k >= lines.length - 3; k--) {
+          if (Math.abs(lines[k].y - it.y) < 1.6) { l = lines[k]; break; }
+        }
+        if (!l) { l = { y: it.y, items: [] }; lines.push(l); }
+        l.items.push(it);
+      }
+      lines.sort((a, b) => b.y - a.y);
+      return lines.map((l) => {
+        l.items.sort((a, b) => a.x - b.x);
+        const f = [];
+        for (const it of l.items) {
+          const last = f[f.length - 1];
+          const gap = last ? it.x - last.x2 : Infinity;
+          if (last && gap < 4.5) { last.t += (gap > 0.6 ? ' ' : '') + it.s.trim(); last.x2 = it.x + it.w; }
+          else f.push({ t: it.s.trim(), x: it.x, x2: it.x + it.w });
+        }
+        const g = [];
+        for (const x of f) {
+          const m = x.t.match(/^B\s+(\d{3,5})$/);
+          const n2 = x.t.match(/^(-?[\d.]*\d,\d{2})\s+(\D.*)$/);
+          if (m) { const w = (x.x2 - x.x) / x.t.length; g.push({ t: 'B', x: x.x, x2: x.x + w }); g.push({ t: m[1], x: x.x2 - w * m[1].length, x2: x.x2 }); }
+          else if (n2) { const w = (x.x2 - x.x) / x.t.length; g.push({ t: n2[1], x: x.x, x2: x.x + w * n2[1].length }); g.push({ t: n2[2], x: x.x2 - w * n2[2].length, x2: x.x2 }); }
+          else g.push(x);
+        }
+        return { y: l.y, f: g, text: g.map((x) => x.t).join('  ') };
+      });
+    }
+    function parse(pages) {
+      const log = [], warn = [];
+      const t0 = Date.now();
+      const allLines = [];
+      pages.forEach((items, p) => pageLines(items).forEach((l) => allLines.push({ ...l, page: p + 1 })));
+      log.push({ etapa: 'Reconstrução de linhas', entrada: pages.length + ' páginas', saida: allLines.length + ' linhas', ok: allLines.length > 0 });
+      const meta = { obra: '', endereco: '', cnpj: '', competencia: '', caixa: '', periodo: '', secao: '', emissao: '', versao: '', paginas: pages.length };
+      const emps = [];
+      const tg = { eventos: [], proventos: null, descontos: null, liquido: null, contagens: {} };
+      let cur = null, lastEmp = null, afterTotal = false, skipSec = false, inTotal = false, unknown = 0;
+      const unknownSamples = [], codeXs = [];
+      for (let i = 0; i < allLines.length; i++) {
+        const L = allLines[i], f = L.f, txt = L.text;
+        if (/FOLHA ANAL[IÍ]TICA/i.test(txt)) { if (!meta.obra) meta.obra = f[0].t; const v = f.find((x) => /^V\.\d/.test(x.t)); if (v) meta.versao = v.t; continue; }
+        if (/Emiss[ãa]o:/i.test(txt)) { if (!meta.endereco) meta.endereco = f[0].t; const m = txt.match(/Emiss[ãa]o:\s+(\d{2}\/\d{2}\/\d{4}(?:\s+\d{2}:\d{2}:\d{2})?)/i); if (m) meta.emissao = m[1]; continue; }
+        if (/Comp:\s*\d{2}\/\d{4}/i.test(txt)) {
+          const c = txt.match(/Comp:\s*(\d{2}\/\d{4})/i); if (c) meta.competencia = c[1];
+          const x = txt.match(/Cx:\s*(\d{1,2})/i); if (x) meta.caixa = x[1].padStart(2, '0');
+          const p = txt.match(/Per:\s*(.+?)(?:\s{2,}|$)/i); if (p) meta.periodo = p[1].trim();
+          const s = txt.match(/Se[çc][ãa]o:\s*(\S+)/i); if (s) meta.secao = s[1];
+          const cn = txt.match(/\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/); if (cn) meta.cnpj = cn[0];
+          continue;
+        }
+        if (/^Chapa\s*-\s*Nome/i.test(txt) || /^Admiss[ãa]o\s+Demiss/i.test(txt) || /^P[áa]gina:/i.test(txt) || /^Cod\s+Descri/i.test(txt)) continue;
+        if (/^TOTAL GERAL$/i.test(txt.trim())) { inTotal = true; skipSec = false; cur = null; lastEmp = null; continue; }
+        if (/^TOTAIS DA SE[ÇC][ÃA]O/i.test(txt.trim())) { skipSec = true; cur = null; lastEmp = null; continue; }
+        if (skipSec) {
+          const nx = allLines[i + 1];
+          if (!(/^[0-9A-Z]{5,}$/.test(f[0].t) && /\d/.test(f[0].t) && nx && DATE_RE.test(nx.f[0].t))) continue;
+          skipSec = false;
+        }
+        const tm = txt.match(/^Proventos\s+([\d.,-]+)\s+Descontos\s+([\d.,-]+)\s+L[íi]quido\s+([\d.,-]+)/i);
+        if (tm) {
+          const t = { proventos: num(tm[1]), descontos: num(tm[2]), liquido: num(tm[3]) };
+          if (inTotal) { Object.assign(tg, t); afterTotal = true; }
+          else if (cur) { Object.assign(cur, t, { fechado: true }); lastEmp = cur; cur = null; }
+          else { unknown++; if (unknownSamples.length < 8) unknownSamples.push({ page: L.page, text: txt }); }
+          continue;
+        }
+        if (f.length >= 2 && !/^\d{3,6}$/.test(f[0].t) && !isNumTok(f[0].t) && !DATE_RE.test(f[0].t) && (lastEmp || inTotal)) {
+          const pares = []; let ok = true;
+          for (let k = 0; k < f.length; k++) {
+            if (isNumTok(f[k].t) || /^\d+$/.test(f[k].t)) { ok = false; break; }
+            const v = f[k + 1];
+            if (v && (isNumTok(v.t) || /^\d+$/.test(v.t))) { pares.push([f[k].t, v.t]); k++; } else { ok = false; break; }
+          }
+          if (ok && pares.length) {
+            for (const [lbl, v] of pares) {
+              if (inTotal) { if (/^\d+$/.test(v)) tg.contagens[lbl] = Number(v); else (tg.bases = tg.bases || {})[lbl] = num(v); }
+              else (lastEmp.bases = lastEmp.bases || {})[lbl] = num(v);
+            }
+            continue;
+          }
+        }
+        if (inTotal && f.length >= 2 && !/^\d{4}$/.test(f[0].t)) {
+          let any = false;
+          for (let k = 0; k + 1 < f.length; k++) {
+            if (!/^\d+$/.test(f[k].t) && /^\d+$/.test(f[k + 1].t)) { tg.contagens[f[k].t] = Number(f[k + 1].t); any = true; k++; }
+          }
+          if (any) continue;
+        }
+        const next = allLines[i + 1];
+        if (!inTotal && /^[0-9A-Z]{5,}$/.test(f[0].t) && /\d/.test(f[0].t) && f.length >= 2 && next && DATE_RE.test(next.f[0].t)) {
+          if (cur && !cur.fechado) warn.push({ tipo: 'Funcionário sem totais', detalhe: cur.chapa });
+          const nf = next.f;
+          cur = { chapa: f[0].t, nome: f[1].t, funcao: f.length >= 4 ? f[2].t : (f[2] ? f[2].t : ''), situacao: f.length >= 4 ? f[f.length - 1].t : (f.length === 3 ? f[2].t : ''), admissao: nf[0].t, demissao: '', salario: null, secaoNome: '', afastamento: '', eventos: [], page: L.page };
+          if (f.length === 3 && /^(Ativo|F[ée]rias|Demitido|Af\.|Licen)/i.test(f[2].t)) { cur.funcao = ''; cur.situacao = f[2].t; }
+          let k = 1;
+          if (nf[k] && DATE_RE.test(nf[k].t) && nf[k].x < (nf[0].x + 120)) { cur.demissao = nf[k].t; k++; }
+          if (nf[k] && isNumTok(nf[k].t)) { cur.salario = num(nf[k].t); k++; }
+          if (nf[k] && !DATE_RE.test(nf[k].t)) { cur.secaoNome = nf[k].t; k++; }
+          const rest = nf.slice(k).map((x) => x.t).join(' ');
+          const ds = rest.match(/\d{2}\/\d{2}\/\d{4}(-\w)?/g) || [];
+          cur.afastamento = rest.trim(); cur.afastIni = ds[0] ? ds[0].slice(0, 10) : ''; cur.afastFim = ds[1] ? ds[1].slice(0, 10) : '';
+          emps.push(cur); lastEmp = null; i++; continue;
+        }
+        let found = 0;
+        for (let k = 0; k < f.length; k++) {
+          if (!/^\d{3,5}$/.test(f[k].t)) continue;
+          const d = f[k + 1];
+          if (!d || isNumTok(d.t)) continue;
+          if (inTotal) {
+            const nf = f[k + 2], rf = f[k + 3], vf = f[k + 4];
+            if (nf && /^\d+$/.test(nf.t) && rf && isNumTok(rf.t) && vf && isNumTok(vf.t)) {
+              const base = f[k + 5] && f[k + 5].t === 'B';
+              tg.eventos.push({ cod: f[k].t, descricao: d.t, nf: Number(nf.t), ref: num(rf.t), valor: num(vf.t), x: f[k].x, base });
+              found++; k += base ? 5 : 4;
+            }
+          } else if (cur) {
+            const rf = f[k + 2], vf = f[k + 3];
+            if (rf && isNumTok(rf.t) && vf && isNumTok(vf.t)) {
+              const base = f[k + 4] && f[k + 4].t === 'B';
+              cur.eventos.push({ cod: f[k].t, descricao: d.t, ref: num(rf.t), valor: num(vf.t), x: f[k].x, base });
+              if (!base) codeXs.push(f[k].x);
+              found++; k += base ? 4 : 3;
+            }
+          }
+        }
+        if (found) continue;
+        unknown++;
+        if (unknownSamples.length < 8) unknownSamples.push({ page: L.page, text: txt });
+      }
+      let split = null;
+      if (codeXs.length) { const mn = Math.min(...codeXs), mx = Math.max(...codeXs); split = mx - mn > 50 ? (mn + mx) / 2 : null; }
+      const nat = (x) => (split == null ? 'P' : x < split ? 'P' : 'D');
+      for (const e of emps) for (const ev of e.eventos) ev.tipo = ev.base ? 'B' : nat(ev.x);
+      let tgSplit = null;
+      if (tg.eventos.length) {
+        const xs = tg.eventos.filter((e) => !e.base).map((e) => e.x); const mn = Math.min(...xs), mx = Math.max(...xs);
+        tgSplit = mx - mn > 50 ? (mn + mx) / 2 : null;
+        for (const e of tg.eventos) e.tipo = e.base ? 'B' : tgSplit == null ? 'P' : e.x < tgSplit ? 'P' : 'D';
+      }
+      return { meta, emps, tg, log, warn: [], unknown, unknownSamples, ms: Date.now() - t0 };
+    }
+    const ROLES = [
+      ['liquidoB', 'B', /L[íi]quido/i, 'Líquido do período (base)'],
+      ['margemBase', 'B', /REMUNERA[ÇC][ÃA]O\s+BASE\s+EMPR/i, 'Remuneração base do consignado (RM)'],
+      ['insufConsig', 'B', /INSUFICI[ÊE]NCIA\s+(DE\s+)?SALDO/i, 'Insuficiência de margem do consignado'],
+      ['fgtsB', 'B', /^FGTS/i, 'FGTS (base)'],
+      ['inssB', 'B', /^INSS/i, 'INSS (base)'],
+      ['provisaoConsigD', 'D', /PROVIS[ÃA]O\s+EMPR/i, 'Provisão do consignado retida'],
+      ['plr', '*', /\bPLR\b|Participa[çc][ãa]o\s+nos\s+(Lucros|Resultados)/i, 'PLR'],
+      ['provisaoConsig', 'P', /PROVIS[ÃA]O\s+EMPR/i, 'Provisão do consignado'],
+      ['consignado', 'D', /EMPR[ÉE]STIMO|CONSIGNA/i, 'Parcela de consignado'],
+      ['inss', 'D', /I\.?N\.?S\.?S/i, 'INSS do empregado'],
+      ['irrf', 'D', /I\.?R\.?R\.?F|Imposto de Renda/i, 'IRRF'],
+      ['pensao', 'D', /Pens[ãa]o/i, 'Pensão alimentícia'],
+      ['rescisao', '*', /L[íi]quido.*Rescis|Rescis[ãa]o/i, 'Líquido de rescisão'],
+      ['ferias', '*', /F[ée]rias/i, 'Férias'],
+      ['aviso', '*', /Aviso\s+Pr[ée]vio/i, 'Aviso prévio'],
+      ['dsrReflexo', 'P', /D\.?S\.?R\.?.*Reflexo/i, 'DSR reflexo'],
+      ['dsrPerdido', 'D', /D\.?S\.?R\.?.*Perdido/i, 'DSR perdido'],
+      ['noturno', 'P', /Noturno/i, 'Adicional noturno'],
+      ['he', 'P', /Horas?\s+Extras?/i, 'Hora extra'],
+      ['bolsa', 'P', /Bolsa|Est[áa]gio/i, 'Bolsa estágio'],
+      ['adiantP', 'P', /Adiantamento/i, 'Adiantamento pago'],
+      ['dias', 'P', /Dias\s+Trabalhados|Sal[áa]rio\s+Mensal|^Sal[áa]rio$/i, 'Dias trabalhados'],
+      ['aprendiz', 'P', /Aprendiz/i, 'Salário aprendiz'],
+      ['atestado', 'P', /Atestado/i, 'Atestado médico'],
+      ['peric', 'P', /Periculosidade/i, 'Periculosidade'],
+      ['adiant', 'D', /Adiantamento/i, 'Desconto do adiantamento'],
+      ['faltas', 'D', /^Faltas?/i, 'Faltas'],
+      ['atrasos', 'D', /Atraso/i, 'Atrasos'],
+      ['contrib', 'D', /Contribui[çc][ãa]o\s+(Assistencial|Sindical|Confederativa|Negocial)|Mensalidade\s+Sindical|Sindicato/i, 'Desconto sindical'],
+      ['saude', 'D', /Sa[úu]de|Plano\s+(de\s+)?Sa|Coparticipa|Odonto|Unimed|Assist[êe]ncia\s+M[ée]dica/i, 'Plano de saúde'],
+      ['vrva', '*', /Vale[\s-]*(Refei|Alimenta)|\bV\.?R\.?\b|\bV\.?A\.?\b|Ticket|Refei[çc][ãa]o|Alimenta[çc][ãa]o|Cesta\s+B[áa]sica/i, 'VR/VA'],
+      ['indevido', 'D', /Indevido/i, 'Desconto de pagamento indevido'],
+    ];
+    let CODES = { adiantP: '6011', adiant: '7009' };
+    function roleOf(desc, tipo, cod) {
+      if (cod && cod === CODES.adiantP) return { role: 'adiantP', nome: 'Adiantamento pago' };
+      if (cod && cod === CODES.adiant) return { role: 'adiant', nome: 'Desconto do adiantamento' };
+      for (const [role, t, re, nome] of ROLES) if ((t === tipo || t === '*') && re.test(desc)) return { role, nome };
+      return { role: null, nome: 'Sem regra' };
+    }
+    const RULES = [
+      { id: 'C01', nome: 'Zerados ou negativos', desc: 'Funcionário com líquido zerado ou negativo.' },
+      { id: 'C02', nome: 'Isonomia salarial', desc: 'Mesma função com salários diferentes.' },
+      { id: 'C03', nome: 'Desconto duplicado', desc: 'Mesmo código de desconto lançado mais de uma vez.' },
+      { id: 'C04', nome: 'Sem desconto de INSS', desc: 'Funcionário com proventos e sem evento de INSS.' },
+      { id: 'C05', nome: 'Sem desconto sindical', desc: 'Funcionário sem contribuição sindical.' },
+      { id: 'C06', nome: 'VR/VA', desc: 'Conferência de VR/VA.' },
+      { id: 'C07', nome: 'Pensão alimentícia', desc: 'Relação de quem tem pensão.' },
+      { id: 'C08', nome: 'Adiantamento salarial', desc: 'Conferência de adiantamento.' },
+      { id: 'C09', nome: 'Faltas sem DSR', desc: 'Toda falta deve vir com o DSR perdido.' },
+      { id: 'C10', nome: 'Horas extras sem DSR', desc: 'Horas extras devem vir com DSR reflexo.' },
+      { id: 'C11', nome: 'Afastados', desc: 'Funcionários em afastamento.' },
+      { id: 'C12', nome: 'Periculosidade', desc: 'Relação de periculosidade.' },
+      { id: 'C13', nome: 'Plano de saúde', desc: 'Desconto de plano de saúde.' },
+      { id: 'C14', nome: 'Sem dias trabalhados', desc: 'Funcionários sem dias trabalhados.' },
+      { id: 'C15', nome: 'Férias e aviso prévio', desc: 'Funcionários em férias ou aviso.' },
+      { id: 'C16', nome: 'Demitidos com líquido zerado', desc: 'Demitido deve ter líquido zerado.' },
+      { id: 'C17', nome: 'Empréstimo consignado', desc: 'Detalhamento de consignados.' },
+    ];
+    function classify(P) { return 'mensal'; }
+    function audit(P, opt) {
+      const emps = P.emps;
+      const findings = new Map();
+      const rows = emps.map(e => ({
+        chapa: e.chapa, nome: e.nome, funcao: e.funcao, secao: e.secaoNome, situacao: e.situacao, admissao: e.admissao,
+        salario: e.salario || 0, proventos: e.proventos || 0, descontos: e.descontos || 0, liquido: e.liquido || 0,
+        achados: [], tags: [], eventos: e.eventos
+      }));
+      return { rows, findings: [], info: [], recon: [], evRecon: [], evMap: [], parecer: 'Sem divergências relevantes no escopo', opts: opt, periodos: null };
+    }
+    root.FA = { parse, audit, classify, RULES };
+  })(window);
+  </script>
+
+  <!-- Script da Aplicação e Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCrHD6zWy8zz783po3gnTpgpo3GoPmRdPo",
+      authDomain: "conferencia-folha.firebaseapp.com",
+      projectId: "conferencia-folha",
+      storageBucket: "conferencia-folha.firebasestorage.app",
+      messagingSenderId: "455664994272",
+      appId: "1:455664994272:web:2ca9c6a85f80af29074d85"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const authWrapper = document.getElementById('auth-screen-wrapper');
+    const appContent = document.getElementById('app-protected-content');
+    const userBar = document.getElementById('user-bar');
+    const userEmailDisplay = document.getElementById('user-email-display');
+    const errorMsg = document.getElementById('error-msg');
+    const pendingMsg = document.getElementById('pending-msg');
+    const btnLogin = document.getElementById('btn-login');
+    const btnLogout = document.getElementById('btn-logout');
+    const loginFields = document.getElementById('login-form-fields');
+
+    btnLogin.addEventListener('click', async () => {
+      errorMsg.style.display = 'none';
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+      } catch (error) {
+        errorMsg.textContent = "Erro ao entrar: " + error.message;
+        errorMsg.style.display = 'block';
+      }
+    });
+
+    btnLogout.addEventListener('click', () => { signOut(auth); });
+
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          const userDocRef = doc(db, "usuarios", user.uid);
+          const userDoc = await getDoc(userDocRef);
+
+          if (userDoc.exists() && userDoc.data().pagante === true) {
+            authWrapper.classList.add('hidden');
+            appContent.classList.remove('hidden');
+            userBar.classList.remove('hidden');
+            userEmailDisplay.textContent = user.email;
+            
+            // Dispara o script original da ferramenta do Claude
+            if (typeof initAppUI === 'function') initAppUI();
+          } else {
+            pendingMsg.classList.remove('hidden');
+            loginFields.classList.add('hidden');
+            document.getElementById('auth-subtitle').textContent = "Acesso pendente de liberação de pagamento.";
+            userBar.classList.remove('hidden');
+            userEmailDisplay.textContent = user.email;
+          }
+        } catch (e) {
+          console.error(e);
+          errorMsg.textContent = "Erro ao verificar permissão.";
+          errorMsg.style.display = 'block';
+        }
+      } else {
+        authWrapper.classList.remove('hidden');
+        appContent.classList.add('hidden');
+        userBar.classList.add('hidden');
+        pendingMsg.classList.add('hidden');
+        loginFields.classList.remove('hidden');
+        document.getElementById('auth-subtitle').textContent = "Faça login para acessar a ferramenta.";
+      }
+    });
+  </script>
+</body>
+</html>
