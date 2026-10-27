@@ -619,7 +619,7 @@
             const user = userCredential.user;
 
             await setDoc(doc(db, "usuarios", user.uid), {
-              cnpjs: [cnpj],
+              cnpj: [cnpj],
               pagante: false
             });
 
@@ -639,9 +639,19 @@
             const userDocRef = doc(db, "usuarios", user.uid);
             const userDoc = await getDoc(userDocRef);
 
-            const listaCnpjs = userDoc.exists() ? (userDoc.data().cnpjs || []) : [];
-            const cnpjAntigo = userDoc.exists() ? userDoc.data().cnpj : null;
-            const temPermissao = listaCnpjs.includes(cnpj) || cnpjAntigo === cnpj;
+            // Lê o campo "cnpj" do banco (que agora é uma lista/array)
+            const dadosBanco = userDoc.exists() ? userDoc.data() : null;
+            let listaCnpjs = [];
+
+            if (dadosBanco) {
+              if (Array.isArray(dadosBanco.cnpj)) {
+                listaCnpjs = dadosBanco.cnpj;
+              } else if (typeof dadosBanco.cnpj === 'string') {
+                listaCnpjs = [dadosBanco.cnpj];
+              }
+            }
+
+            const temPermissao = listaCnpjs.includes(cnpj);
 
             if (!userDoc.exists() || !temPermissao) {
               await signOut(auth);
@@ -652,7 +662,7 @@
               return;
             }
 
-            if (userDoc.data().pagante !== true) {
+            if (dadosBanco.pagante !== true) {
               await signOut(auth);
               if (pendingMsg) pendingMsg.classList.remove('hidden');
               if (loginFields) loginFields.classList.add('hidden');
@@ -721,7 +731,7 @@
       btnLogout.addEventListener('click', () => { signOut(auth); });
     }
 
-    // Monitora autenticação (Modificado para nunca exibir tela branca se não houver login ativo)
+    // Monitora autenticação
     onAuthStateChanged(auth, async (user) => {
       if (!user) {
         if (authWrapper) {
