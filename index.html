@@ -59,7 +59,7 @@
 
       <div id="pending-msg" class="hidden" style="text-align: center; color: var(--muted); margin-top: 10px;">
         <p><b>Acesso Negado ou Pendente.</b></p>
-        <p style="font-size: 0.85rem; margin-top: 6px;" id="pending-desc">O CNPJ informado não confere com o cadastro ou a assinatura está pendente.</p>
+        <p style="font-size: 0.85rem; margin-top: 6px;" id="pending-desc">O CNPJ informado não está liberado para esta conta ou a assinatura está pendente.</p>
         <button type="button" id="btn-voltar-login" style="margin-top: 12px; padding: 6px 12px; background: var(--accent); color: #fff; border: none; border-radius: 4px; cursor: pointer;">Tentar novamente</button>
       </div>
     </div>
@@ -618,8 +618,9 @@
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
 
+            // Salva como uma lista (array) de CNPJs no cadastro inicial
             await setDoc(doc(db, "usuarios", user.uid), {
-              cnpj: cnpj,
+              cnpjs: [cnpj],
               pagante: false
             });
 
@@ -639,10 +640,16 @@
             const userDocRef = doc(db, "usuarios", user.uid);
             const userDoc = await getDoc(userDocRef);
 
-            if (!userDoc.exists() || userDoc.data().cnpj !== cnpj) {
+            // Verifica se o documento existe e se o CNPJ digitado está dentro da lista (array) de cnpjs
+            const listaCnpjs = userDoc.exists() ? (userDoc.data().cnpjs || []) : [];
+            const cnpjCadastradoAntigo = userDoc.exists() ? userDoc.data().cnpj : null; // compatibilidade caso tenha formato antigo
+
+            const temPermissao = listaCnpjs.includes(cnpj) || cnpjCadastradoAntigo === cnpj;
+
+            if (!userDoc.exists() || !temPermissao) {
               await signOut(auth);
               if (errorMsg) {
-                errorMsg.textContent = "O CNPJ informado não confere com o cadastro deste usuário.";
+                errorMsg.textContent = "O CNPJ informado não está liberado para esta conta.";
                 errorMsg.style.display = 'block';
               }
               return;
@@ -725,7 +732,11 @@
           const userDoc = await getDoc(userDocRef);
           const cnpjInformado = cnpjInput ? cnpjInput.value.trim() : '';
 
-          if (userDoc.exists() && userDoc.data().pagante === true && userDoc.data().cnpj === cnpjInformado) {
+          const listaCnpjs = userDoc.exists() ? (userDoc.data().cnpjs || []) : [];
+          const cnpjAntigo = userDoc.exists() ? userDoc.data().cnpj : null;
+          const temPermissao = listaCnpjs.includes(cnpjInformado) || cnpjAntigo === cnpjInformado;
+
+          if (userDoc.exists() && userDoc.data().pagante === true && temPermissao) {
             if (authWrapper) authWrapper.classList.add('hidden');
             if (appContent) appContent.classList.remove('hidden');
             if (userBar) userBar.classList.remove('hidden');
@@ -736,15 +747,8 @@
         }
       } else {
         if (authWrapper) {
-          authWrapper.classList.remove('hidden');
-          authWrapper.style.display = 'flex';
+          authWrapper.classList.add('hidden'); // Fica oculto até validar o login
         }
-        if (appContent) appContent.classList.add('hidden');
-        if (userBar) userBar.classList.add('hidden');
-        if (pendingMsg) pendingMsg.classList.add('hidden');
-        if (loginFields) loginFields.classList.remove('hidden');
-        if (authTitle) authTitle.textContent = "Conferência de Folha";
-        if (authSubtitle) authSubtitle.textContent = "Informe suas credenciais e o CNPJ para acessar.";
       }
     });
   </script>
