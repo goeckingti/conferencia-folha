@@ -22,20 +22,6 @@
     .auth-box h2 { margin: 0 0 4px 0; font-size: 1.5rem; color: var(--accent); }
     .auth-box p { margin: 0 0 12px 0; color: var(--muted); font-size: 0.9rem; }
     
-    /* CORREÇÃO DO TAMANHO DOS CAMPOS */
-    .inp { 
-      padding: 10px 14px !important; 
-      border: 1px solid var(--line) !important; 
-      border-radius: 6px !important; 
-      font-size: 0.95rem !important; 
-      width: 100% !important; 
-      height: 42px !important; 
-      min-height: unset !important;
-      box-sizing: border-box !important; 
-      background: #fff !important;
-      color: var(--ink) !important;
-    }
-    
     .btn-login-custom { padding: 11px 16px; background: var(--accent); color: var(--accent-ink); border: none; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; font-size: 0.95rem; }
     .btn-login-custom:hover { opacity: 0.9; }
     .msg { font-size: 0.85rem; color: var(--bad); background: var(--bad-soft); padding: 8px; border-radius: 4px; display: none; }
@@ -50,7 +36,7 @@
   <div id="auth-screen-wrapper">
     <div class="auth-box">
       <h2 id="auth-title">Conferência de Folha</h2>
-      <p id="auth-subtitle">Faça login para acessar a ferramenta.</p>
+      <p id="auth-subtitle">Informe suas credenciais e o CNPJ para acessar.</p>
       
       <div id="error-msg" class="msg"></div>
       <div id="success-msg" style="font-size: 0.85rem; color: #2c7549; background: #e4f1e8; padding: 8px; border-radius: 4px; display: none; margin-bottom: 10px;"></div>
@@ -59,6 +45,9 @@
         <input type="email" id="email" placeholder="Seu e-mail" style="display: block !important; width: 100% !important; max-width: 100% !important; height: 42px !important; min-height: 42px !important; max-height: 42px !important; padding: 0 14px !important; margin: 0 !important; border: 1px solid #d8dfe3 !important; border-radius: 6px !important; font-size: 15px !important; background: #fff !important; color: #1a2329 !important; box-sizing: border-box !important; outline: none !important;">
         
         <input type="password" id="password" placeholder="Sua senha" style="display: block !important; width: 100% !important; max-width: 100% !important; height: 42px !important; min-height: 42px !important; max-height: 42px !important; padding: 0 14px !important; margin: 0 !important; border: 1px solid #d8dfe3 !important; border-radius: 6px !important; font-size: 15px !important; background: #fff !important; color: #1a2329 !important; box-sizing: border-box !important; outline: none !important;">
+
+        <!-- CAMPO DE CNPJ VISÍVEL NO LOGIN E CADASTRO -->
+        <input type="text" id="cnpj" placeholder="CNPJ da empresa (ex: 00.000.000/0001-00)" style="display: block !important; width: 100% !important; max-width: 100% !important; height: 42px !important; min-height: 42px !important; max-height: 42px !important; padding: 0 14px !important; margin: 0 !important; border: 1px solid #d8dfe3 !important; border-radius: 6px !important; font-size: 15px !important; background: #fff !important; color: #1a2329 !important; box-sizing: border-box !important; outline: none !important;">
         
         <button type="button" id="btn-action" class="btn-login-custom">Entrar</button>
         
@@ -69,8 +58,8 @@
       </div>
 
       <div id="pending-msg" class="hidden" style="text-align: center; color: var(--muted); margin-top: 10px;">
-        <p><b>Conta criada com sucesso!</b></p>
-        <p style="font-size: 0.85rem; margin-top: 6px;">Sua assinatura está pendente. Realize o pagamento para liberarmos o seu acesso.</p>
+        <p><b>Acesso Pendente.</b></p>
+        <p style="font-size: 0.85rem; margin-top: 6px;">Realize o pagamento para liberar o acesso a este CNPJ.</p>
       </div>
     </div>
   </div>
@@ -83,7 +72,6 @@
 
   <!-- A FERRAMENTA COMPLETA DO CLIENTE (O CÓDIGO DO CLAUDE) -->
   <div id="app-protected-content" class="hidden">
-    <!-- Aqui entra o miolo original do HTML do seu cliente -->
     <style>
       :root {
         --bg: #f3f5f6; --panel: #ffffff; --sunk: #ebeff1; --ink: #1a2329; --muted: #5a6871; --line: #d8dfe3;
@@ -558,6 +546,7 @@
     const forgotPassword = document.getElementById('forgot-password');
     const authTitle = document.getElementById('auth-title');
     const authSubtitle = document.getElementById('auth-subtitle');
+    const cnpjInput = document.getElementById('cnpj');
 
     let isRegistering = false;
 
@@ -567,14 +556,15 @@
       isRegistering = !isRegistering;
       errorMsg.style.display = 'none';
       successMsg.style.display = 'none';
+      
       if (isRegistering) {
         authTitle.textContent = "Criar Conta";
-        authSubtitle.textContent = "Cadastre seu e-mail e senha para começar.";
+        authSubtitle.textContent = "Cadastre suas credenciais e o CNPJ principal.";
         btnAction.textContent = "Cadastrar";
         toggleMode.textContent = "Já tem uma conta? Faça login";
       } else {
         authTitle.textContent = "Conferência de Folha";
-        authSubtitle.textContent = "Faça login para acessar a ferramenta.";
+        authSubtitle.textContent = "Informe suas credenciais e o CNPJ para acessar.";
         btnAction.textContent = "Entrar";
         toggleMode.textContent = "Não tem conta? Cadastre-se";
       }
@@ -586,30 +576,35 @@
       successMsg.style.display = 'none';
       const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
+      const cnpj = cnpjInput.value.trim();
 
-      if (!email || !password) {
-        errorMsg.textContent = "Preencha o e-mail e a senha.";
+      if (!email || !password || !cnpj) {
+        errorMsg.textContent = "Preencha todos os campos, incluindo o CNPJ.";
         errorMsg.style.display = 'block';
         return;
       }
 
       try {
         if (isRegistering) {
-          // Criar Conta
           const userCredential = await createUserWithEmailAndPassword(auth, email, password);
           const user = userCredential.user;
 
-          // Cria o registro no Firestore com pagante: false automaticamente
+          // Salva os dados iniciais incluindo o CNPJ preenchido
           await setDoc(doc(db, "usuarios", user.uid), {
             email: email,
+            cnpj: cnpj,
             pagante: false,
             criadoEm: new Date().toISOString()
           });
 
-          successMsg.textContent = "Conta criada com sucesso!";
+          successMsg.textContent = "Conta criada com sucesso! Faça login.";
           successMsg.style.display = 'block';
+          isRegistering = false;
+          authTitle.textContent = "Conferência de Folha";
+          authSubtitle.textContent = "Informe suas credenciais e o CNPJ para acessar.";
+          btnAction.textContent = "Entrar";
+          toggleMode.textContent = "Não tem conta? Cadastre-se";
         } else {
-          // Fazer Login
           await signInWithEmailAndPassword(auth, email, password);
         }
       } catch (error) {
@@ -649,12 +644,15 @@
         try {
           const userDocRef = doc(db, "usuarios", user.uid);
           const userDoc = await getDoc(userDocRef);
+          const cnpjInformado = cnpjInput.value.trim();
 
           if (userDoc.exists() && userDoc.data().pagante === true) {
             authWrapper.classList.add('hidden');
             appContent.classList.remove('hidden');
             userBar.classList.remove('hidden');
-            userEmailDisplay.textContent = user.email;
+            
+            // Exibe o e-mail e o CNPJ informado na barra superior
+            userEmailDisplay.textContent = `${user.email} | CNPJ: ${cnpjInformado || userDoc.data().cnpj || 'Não informado'}`;
           } else {
             pendingMsg.classList.remove('hidden');
             loginFields.classList.add('hidden');
@@ -673,7 +671,7 @@
         pendingMsg.classList.add('hidden');
         loginFields.classList.remove('hidden');
         authTitle.textContent = "Conferência de Folha";
-        authSubtitle.textContent = "Faça login para acessar a ferramenta.";
+        authSubtitle.textContent = "Informe suas credenciais e o CNPJ para acessar.";
         isRegistering = false;
         btnAction.textContent = "Entrar";
         toggleMode.textContent = "Não tem conta? Cadastre-se";
