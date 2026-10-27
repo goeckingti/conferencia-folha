@@ -58,8 +58,9 @@
       </div>
 
       <div id="pending-msg" class="hidden" style="text-align: center; color: var(--muted); margin-top: 10px;">
-        <p><b>Acesso Pendente.</b></p>
-        <p style="font-size: 0.85rem; margin-top: 6px;">Realize o pagamento para liberar o acesso a este CNPJ.</p>
+        <p><b>Acesso Negado ou Pendente.</b></p>
+        <p style="font-size: 0.85rem; margin-top: 6px;" id="pending-desc">O CNPJ informado não confere com o cadastro ou a assinatura está pendente.</p>
+        <button type="button" id="btn-voltar-login" style="margin-top: 12px; padding: 6px 12px; background: var(--accent); color: #fff; border: none; border-radius: 4px; cursor: pointer;">Tentar novamente</button>
       </div>
     </div>
   </div>
@@ -547,15 +548,15 @@
     const authTitle = document.getElementById('auth-title');
     const authSubtitle = document.getElementById('auth-subtitle');
     const cnpjInput = document.getElementById('cnpj');
+    const btnVoltarLogin = document.getElementById('btn-voltar-login');
 
     let isRegistering = false;
 
     // Máscara automática de CNPJ enquanto o usuário digita
     cnpjInput.addEventListener('input', (e) => {
-      let value = e.target.value.replace(/\D/g, ''); // Remove tudo que não for número
-      if (value.length > 14) value = value.slice(0, 14); // Limita ao tamanho máximo do CNPJ
+      let value = e.target.value.replace(/\D/g, '');
+      if (value.length > 14) value = value.slice(0, 14);
 
-      // Aplica a formatação 00.000.000/0001-00
       if (value.length > 12) {
         value = value.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
       } else if (value.length > 8) {
@@ -607,7 +608,6 @@
           const userCredential = await createUserWithEmailAndPassword(auth, email, password);
           const user = userCredential.user;
 
-          // Salva os dados incluindo o CNPJ formatado com pontos, barra e hífen
           await setDoc(doc(db, "usuarios", user.uid), {
             cnpj: cnpj,
             pagante: false
@@ -621,12 +621,47 @@
           btnAction.textContent = "Entrar";
           toggleMode.textContent = "Não tem conta? Cadastre-se";
         } else {
-          await signInWithEmailAndPassword(auth, email, password);
+          // Faz login no Authentication do Firebase
+          const userCredential = await signInWithEmailAndPassword(auth, email, password);
+          const user = userCredential.user;
+
+          // Busca os dados do usuário no Firestore para validar o CNPJ
+          const userDocRef = doc(db, "usuarios", user.uid);
+          const userDoc = await getDoc(userDocRef);
+
+          if (!userDoc.exists() || userDoc.data().cnpj !== cnpj) {
+            // Se o CNPJ digitado não for igual ao cadastrado, desloga e barra o acesso
+            await signOut(auth);
+            errorMsg.textContent = "O CNPJ informado não confere com o cadastro deste usuário.";
+            errorMsg.style.display = 'block';
+            return;
+          }
+
+          if (userDoc.data().pagante !== true) {
+            // Se o CNPJ confere mas não é pagante, desloga e mostra tela pendente
+            await signOut(auth);
+            pendingMsg.classList.remove('hidden');
+            loginFields.classList.add('hidden');
+            authTitle.textContent = "Acesso Pendente";
+            authSubtitle.textContent = "";
+            document.getElementById('pending-desc').textContent = "Sua assinatura para este CNPJ está pendente de liberação.";
+            return;
+          }
         }
       } catch (error) {
         errorMsg.textContent = "Erro: " + error.message;
         errorMsg.style.display = 'block';
       }
+    });
+
+    // Botão para voltar da tela de pendente para o login
+    btnVoltarLogin.addEventListener('click', async () => {
+      await signOut(auth);
+      pendingMsg.classList.add('hidden');
+      loginFields.classList.remove('hidden');
+      authTitle.textContent = "Conferência de Folha";
+      authSubtitle.textContent = "Informe suas credenciais e o CNPJ para acessar.";
+      document.getElementById('password').value = '';
     });
 
     // Recuperar Senha
@@ -654,7 +689,7 @@
 
     btnLogout.addEventListener('click', () => { signOut(auth); });
 
-    // Monitora autenticação e status de pagante
+    // Monitora autenticação
     onAuthStateChanged(auth, async (user) => {
       if (user) {
         try {
@@ -662,34 +697,25 @@
           const userDoc = await getDoc(userDocRef);
           const cnpjInformado = cnpjInput.value.trim();
 
-          if (userDoc.exists() && userDoc.data().pagante === true) {
+          // Só libera se o documento existir, for pagante e o CNPJ conferir exatamente
+          if (userDoc.exists() && userDoc.data().pagante === true && userDoc.data().cnpj === cnpjInformado) {
             authWrapper.classList.add('hidden');
             appContent.classList.remove('hidden');
             userBar.classList.remove('hidden');
-            
-            userEmailDisplay.textContent = `${user.email} | CNPJ: ${cnpjInformado || userDoc.data().cnpj || 'Não informado'}`;
-          } else {
-            pendingMsg.classList.remove('hidden');
-            loginFields.classList.add('hidden');
-            authTitle.textContent = "Acesso Pendente";
-            authSubtitle.textContent = "";
-            userBar.classList.remove('hidden');
-            userEmailDisplay.textContent = user.email;
+            userEmailDisplay.textContent = `${user.email} | CNPJ: ${cnpjInformado}`;
           }
         } catch (e) {
           console.error(e);
         }
       } else {
-        authWrapper.classList.remove('hidden');
+        authWrapper.classList.add('hidden'); // Evita piscar a tela protegida antes do login
+        authWrapper.style.display = 'flex';
         appContent.classList.add('hidden');
         userBar.classList.add('hidden');
         pendingMsg.classList.add('hidden');
         loginFields.classList.remove('hidden');
         authTitle.textContent = "Conferência de Folha";
         authSubtitle.textContent = "Informe suas credenciais e o CNPJ para acessar.";
-        isRegistering = false;
-        btnAction.textContent = "Entrar";
-        toggleMode.textContent = "Não tem conta? Cadastre-se";
       }
     });
   </script>
