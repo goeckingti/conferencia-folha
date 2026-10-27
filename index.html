@@ -618,7 +618,6 @@
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
 
-            // Salva como uma lista (array) de CNPJs no cadastro inicial
             await setDoc(doc(db, "usuarios", user.uid), {
               cnpjs: [cnpj],
               pagante: false
@@ -640,11 +639,9 @@
             const userDocRef = doc(db, "usuarios", user.uid);
             const userDoc = await getDoc(userDocRef);
 
-            // Verifica se o documento existe e se o CNPJ digitado está dentro da lista (array) de cnpjs
             const listaCnpjs = userDoc.exists() ? (userDoc.data().cnpjs || []) : [];
-            const cnpjCadastradoAntigo = userDoc.exists() ? userDoc.data().cnpj : null; // compatibilidade caso tenha formato antigo
-
-            const temPermissao = listaCnpjs.includes(cnpj) || cnpjCadastradoAntigo === cnpj;
+            const cnpjAntigo = userDoc.exists() ? userDoc.data().cnpj : null;
+            const temPermissao = listaCnpjs.includes(cnpj) || cnpjAntigo === cnpj;
 
             if (!userDoc.exists() || !temPermissao) {
               await signOut(auth);
@@ -724,31 +721,19 @@
       btnLogout.addEventListener('click', () => { signOut(auth); });
     }
 
-    // Monitora autenticação
+    // Monitora autenticação (Modificado para nunca exibir tela branca se não houver login ativo)
     onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        try {
-          const userDocRef = doc(db, "usuarios", user.uid);
-          const userDoc = await getDoc(userDocRef);
-          const cnpjInformado = cnpjInput ? cnpjInput.value.trim() : '';
-
-          const listaCnpjs = userDoc.exists() ? (userDoc.data().cnpjs || []) : [];
-          const cnpjAntigo = userDoc.exists() ? userDoc.data().cnpj : null;
-          const temPermissao = listaCnpjs.includes(cnpjInformado) || cnpjAntigo === cnpjInformado;
-
-          if (userDoc.exists() && userDoc.data().pagante === true && temPermissao) {
-            if (authWrapper) authWrapper.classList.add('hidden');
-            if (appContent) appContent.classList.remove('hidden');
-            if (userBar) userBar.classList.remove('hidden');
-            if (userEmailDisplay) userEmailDisplay.textContent = `${user.email} | CNPJ: ${cnpjInformado}`;
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      } else {
+      if (!user) {
         if (authWrapper) {
-          authWrapper.classList.add('hidden'); // Fica oculto até validar o login
+          authWrapper.classList.remove('hidden');
+          authWrapper.style.display = 'flex';
         }
+        if (appContent) appContent.classList.add('hidden');
+        if (userBar) userBar.classList.add('hidden');
+        if (pendingMsg) pendingMsg.classList.add('hidden');
+        if (loginFields) loginFields.classList.remove('hidden');
+        if (authTitle) authTitle.textContent = "Conferência de Folha";
+        if (authSubtitle) authSubtitle.textContent = "Informe suas credenciais e o CNPJ para acessar.";
       }
     });
   </script>
