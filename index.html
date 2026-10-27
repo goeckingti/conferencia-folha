@@ -639,7 +639,6 @@
             const userDocRef = doc(db, "usuarios", user.uid);
             const userDoc = await getDoc(userDocRef);
 
-            // Lê o campo "cnpj" do banco (que agora é uma lista/array)
             const dadosBanco = userDoc.exists() ? userDoc.data() : null;
             let listaCnpjs = [];
 
@@ -651,7 +650,9 @@
               }
             }
 
-            const temPermissao = listaCnpjs.includes(cnpj);
+            // Normaliza os CNPJs removendo pontuações para evitar divergências de máscara
+            const cnpjInformadoLimpo = cnpj.replace(/\D/g, '');
+            const temPermissao = listaCnpjs.some(c => String(c).replace(/\D/g, '') === cnpjInformadoLimpo);
 
             if (!userDoc.exists() || !temPermissao) {
               await signOut(auth);
@@ -672,6 +673,12 @@
               if (pendingDesc) pendingDesc.textContent = "Sua assinatura para este CNPJ está pendente de liberação.";
               return;
             }
+
+            // LOGIN BEM-SUCEDIDO: Libera a interface protegida e esconde o login
+            if (authWrapper) authWrapper.classList.add('hidden');
+            if (appContent) appContent.classList.remove('hidden');
+            if (userBar) userBar.classList.remove('hidden');
+            if (userEmailDisplay) userEmailDisplay.textContent = `${user.email} | CNPJ: ${cnpj}`;
           }
         } catch (error) {
           if (errorMsg) {
